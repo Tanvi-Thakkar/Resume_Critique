@@ -1,0 +1,17 @@
+uv is a python package that funs in 3.7 and aboce versions.
+
+it is much faster than pip
+
+built using faster language- RUST
+
+Cleaner project management
+
+Streamlit is a Python library that helps you build interactive web apps super easily — especially for data science, machine learning, and dashboards — all with just pure Python.
+Another dependency needed is Openai, using it as llm for analysing the resume
+PyPDF2 for loading the pdfs that we want to analyse
+python-dotenv is a Python package that loads environment variables from a .env file into your project.
+
+what is use of env? Instead of hardcoding sensitive info like database passwords, API keys, or debug settings into your Python file (which is insecure and hard to manage), you store them in a .env file for safer, cleaner access.
+
+streamlit is helpful because we can just write anything we want to add and streamlit will render it correctly
+if you reload your browser or enter a button then the whole script/file runs again
