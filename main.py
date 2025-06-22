@@ -16,7 +16,8 @@ st.markdown("Upload your resume in PDF format and get AI-powered feedback.")
 
 
 #load OpenAI API key from environment variables
-openai_api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = st.secrets["OPENAI_API_KEY"]  # ✅ Correct for Streamlit Cloud
+
 
 uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
 job_role = st.text_input("Enter thr job role that you're applying for (optional)", placeholder="e.g. Software Engineer, Data Scientist")
