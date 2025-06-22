@@ -1,72 +1,3 @@
-"""import streamlit as st
-import PyPDF2
-import io #importing io for byte stream handling
-import os #import os for file handling
-from openai import OpenAI
-from dotenv import load_dotenv
-
-#load environment variables from .env file
-load_dotenv()
-
-#to config the page or set the title
-st.set_page_config(page_title="AI Resume Critique", page_icon=":receipt:") 
-
-st.title("AI Resume Critique")
-st.markdown("Upload your resume in PDF format and get AI-powered feedback.")
-
-
-#load OpenAI API key from environment variables
-openai_api_key = st.secrets["OPENAI_API_KEY"]  # ✅ Correct for Streamlit Cloud
-
-
-uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
-job_role = st.text_input("Enter thr job role that you're applying for (optional)", placeholder="e.g. Software Engineer, Data Scientist")
-
-analyze = st.button("Analyze Resume")
-
-def extract_text_from_pdf(pdf_file):
-    Extract text from a PDF file.
-    try:
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        for page in pdf_reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-        return text
-    except Exception as e:
-        st.error(f"Failed to read PDF: {e}")
-        return ""
-
-
-if analyze and uploaded_file:
-    try:
-        file_content = extract_text_from_pdf(uploaded_file)
-
-        if not file_content.strip():
-            st.error("The uploaded PDF file is empty or could not be read.")
-            st.stop()
-        
-        prompt = fPlease analyze the following resume for the job role '{job_role if job_role else 'general job applications'}':\n\n{file_content}.
-        Provide feedback on the strengths and weaknesses of the resume, and suggest improvements to make it more suitable for the job role.
-        provide some resources that might be used to be a better candidate for the job role.
-
-        client = OpenAI(api_key=openai_api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are an expert resume reviewer."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=1500,
-            temperature=0.7
-        )
-        st.subheader("AI Feedback")
-        st.markdown(response.choices[0].message.content)
-    
-    except Exception as e:
-        st.error(f"An error occurred while processing the PDF file: {e}")"""
-
 import streamlit as st
 import PyPDF2
 import os
@@ -77,7 +8,7 @@ import json
 
 # Load environment variables
 load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = st.secrets["OPENAI_API_KEY"] 
 
 # Custom CSS
 custom_css = """
