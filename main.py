@@ -2,12 +2,9 @@ import streamlit as st
 import PyPDF2
 import os
 from openai import OpenAI
-from dotenv import load_dotenv
 import pandas as pd
 import json
 
-# Load environment variables
-load_dotenv()
 openai_api_key = st.secrets["OPENAI_API_KEY"] 
 
 # Custom CSS
