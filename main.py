@@ -1,11 +1,8 @@
 import streamlit as st
 import PyPDF2
-import os
-from openai import OpenAI
 import pandas as pd
+import random
 import json
-
-openai_api_key = st.secrets["OPENAI_API_KEY"] 
 
 # Custom CSS
 custom_css = """
@@ -25,7 +22,7 @@ st.markdown(custom_css, unsafe_allow_html=True)
 st.set_page_config(page_title="AI Resume Tool", page_icon="🧠")
 st.title("🧠 Resume Critique")
 
-# Function: Extract text from PDF
+# Extract text from PDF
 def extract_text_from_pdf(pdf_file):
     try:
         pdf_reader = PyPDF2.PdfReader(pdf_file)
@@ -35,53 +32,28 @@ def extract_text_from_pdf(pdf_file):
             if page_text:
                 text += page_text + "\n"
         return text
-    except Exception as e:
+    except Exception:
         return ""
 
-# Function: Analyze resume via GPT
+# Dummy analyzer to simulate AI output
 def analyze_resume(content, job_role, include_feedback=True):
-    feedback_section = """
-  ,"strengths": ["..."],
-  "weaknesses": ["..."],
-  "resources": ["..."],
-  "summary": "..."
-""" if include_feedback else ""
+    skills_list = ["Python", "SQL", "React", "Teamwork", "DSA", "Java", "Node.js", "Docker", "MongoDB"]
+    skill_scores = {skill: random.randint(50, 95) for skill in random.sample(skills_list, 5)}
 
-    prompt = f"""
-You are a structured resume reviewer. Analyze the resume for the job role '{job_role}'.
-Return JSON like this:
-
-{{
-  "relevance_score": 78,
-  "skills": {{"Python": 90, "SQL": 70, "React": 40, "Teamwork": 85, "DSA": 75}},
-  "project_fit": 65,
-  "salary_estimate": "₹10–15 LPA"{feedback_section}
-}}
-
-Resume:
-{content}
-"""
-
-    client = OpenAI(api_key=openai_api_key)
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Be structured and return clean JSON."},
-            {"role": "user", "content": prompt}
+    return {
+        "relevance_score": random.randint(60, 95),
+        "skills": skill_scores,
+        "project_fit": random.randint(50, 90),
+        "salary_estimate": "₹8–12 LPA",
+        "strengths": ["Well-structured resume", "Good technical stack", "Teamwork skills"],
+        "weaknesses": ["Missing certifications", "Limited backend experience"],
+        "resources": [
+            "https://www.geeksforgeeks.org/data-structures",
+            "https://roadmap.sh/backend",
+            "https://reactjs.org/docs/getting-started.html"
         ],
-        temperature=0.7
-    )
-    reply = response.choices[0].message.content.strip()
-
-    # Remove Markdown formatting if present
-    if reply.startswith("```json") or reply.startswith("```"):
-        reply = reply.strip("`").replace("json", "", 1).strip()
-
-    try:
-        return json.loads(reply)
-    except json.JSONDecodeError:
-        st.error("❌ Failed to parse the AI response. Please try again.")
-        return {}
+        "summary": f"The resume aligns well with a {job_role} role, with potential to improve in backend development and certifications."
+    }
 
 # Role selector
 if "user_type" not in st.session_state:
@@ -107,38 +79,35 @@ if user_type == "applicant":
         if content.strip():
             result = analyze_resume(content, job_role, include_feedback=True)
 
-            if not result:
-                st.error("Parsing failed. Please check the resume or try again.")
-            else:
-                st.markdown("## 📊 Resume Insights")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("🔍 Relevance", f"{result['relevance_score']}%")
-                    st.metric("💰 Salary Estimate", result['salary_estimate'])
-                with col2:
-                    st.progress(result['relevance_score'], text="Match %")
+            st.markdown("## 📊 Resume Insights")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("🔍 Relevance", f"{result['relevance_score']}%")
+                st.metric("💰 Salary Estimate", result['salary_estimate'])
+            with col2:
+                st.progress(result['relevance_score'], text="Match %")
 
-                st.markdown("### 🧠 Skill Alignment")
-                for skill, score in result["skills"].items():
-                    st.progress(score, text=f"{skill}: {score}%")
+            st.markdown("### 🧠 Skill Alignment")
+            for skill, score in result["skills"].items():
+                st.progress(score, text=f"{skill}: {score}%")
 
-                st.markdown("### 🛠 Project Relevance")
-                st.progress(result["project_fit"], text=f"{result['project_fit']}%")
+            st.markdown("### 🛠 Project Relevance")
+            st.progress(result["project_fit"], text=f"{result['project_fit']}%")
 
-                st.markdown("### ✅ Strengths")
-                for s in result["strengths"]:
-                    st.markdown(f"- {s}")
+            st.markdown("### ✅ Strengths")
+            for s in result["strengths"]:
+                st.markdown(f"- {s}")
 
-                st.markdown("### ❌ Weaknesses")
-                for w in result["weaknesses"]:
-                    st.markdown(f"- {w}")
+            st.markdown("### ❌ Weaknesses")
+            for w in result["weaknesses"]:
+                st.markdown(f"- {w}")
 
-                st.markdown("### 📚 Suggested Resources")
-                for r in result["resources"]:
-                    st.markdown(f"- [{r}]({r})")
+            st.markdown("### 📚 Suggested Resources")
+            for r in result["resources"]:
+                st.markdown(f"- [{r}]({r})")
 
-                st.markdown("### 📝 Summary")
-                st.info(result["summary"])
+            st.markdown("### 📝 Summary")
+            st.info(result["summary"])
         else:
             st.error("Empty or unreadable resume.")
 
