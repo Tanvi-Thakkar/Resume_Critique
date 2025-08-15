@@ -1,172 +1,106 @@
 import streamlit as st
 import PyPDF2
-import openai
-import pandas as pd
-import json
+import io
+import os
+from openai import OpenAI
+from dotenv import load_dotenv
 
-# Custom CSS
-custom_css = """
-<style>
-body {
-    background: linear-gradient(135deg, #f4f4f4, #eaeaea);
-    font-family: 'Segoe UI', sans-serif;
-}
-#MainMenu, header, footer {
-    visibility: hidden;
-}
-</style>
-"""
-st.markdown(custom_css, unsafe_allow_html=True)
+# Load environment variables
+load_dotenv()
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
 # Page config
-st.set_page_config(page_title="AI Resume Tool", page_icon="🧠")
-st.title("🧠 Resume Critique")
+st.set_page_config(page_title="AI Resume Critique", page_icon=":receipt:")
+st.title("🧠 AI Resume Critique")
+st.markdown("Upload your resume and get **AI-powered, job-specific feedback**, including estimated salary and skill match.")
 
-# Ask for API key
-openai_api_key = st.text_input("🔑 Enter your OpenAI API Key", type="password")
-if not openai_api_key:
-    st.warning("Please enter your OpenAI API key to continue.")
-    st.stop()
+# File uploader and job role input
+uploaded_file = st.file_uploader("📄 Upload your resume (PDF)", type="pdf")
+job_role = st.text_input("🎯 Target Job Role", placeholder="e.g. Software Engineer, Data Scientist")
+analyze = st.button("🚀 Analyze Resume")
 
-openai.api_key = openai_api_key
-
-# Extract text from PDF
+# Function to extract PDF text
 def extract_text_from_pdf(pdf_file):
     try:
-        reader = PyPDF2.PdfReader(pdf_file)
-        return "\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        text = ""
+        for page in pdf_reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+        return text
     except Exception as e:
-        st.error("Error reading PDF: " + str(e))
+        st.error(f"Failed to read PDF: {e}")
         return ""
 
-# Analyze Resume
-def analyze_resume(content, job_role, include_feedback=True):
-    feedback_section = """,
-  "strengths": ["..."],
-  "weaknesses": ["..."],
-  "resources": ["..."],
-  "summary": "..."
-""" if include_feedback else ""
+if analyze and uploaded_file:
+    file_content = extract_text_from_pdf(uploaded_file)
 
+    if not file_content.strip():
+        st.error("The uploaded PDF file is empty or could not be read.")
+        st.stop()
+
+    # Build the prompt
     prompt = f"""
-You are a structured resume reviewer. Analyze the resume for the job role '{job_role}'.
-Return JSON like this:
-
+You are an expert resume reviewer. Analyze the following resume for the job role '{job_role if job_role else 'general job applications'}':\n\n{file_content}\n\n
+1. Rate the resume's overall relevance to the job (as a percentage).
+2. Identify top 5 key skills and rate their alignment with the job (as percentages).
+3. Review listed projects and rate their fit for the job.
+4. Estimate a reasonable salary range based on the resume and job role (in INR).
+5. List 3-5 suggestions for improvement.
+Format your response in JSON like this:
 {{
   "relevance_score": 78,
-  "skills": {{"Python": 90, "SQL": 70, "React": 40, "Teamwork": 85, "DSA": 75}},
+  "skills": {{"Python": 90, "React": 60, "SQL": 70, "Teamwork": 85, "ML": 75}},
   "project_fit": 65,
-  "salary_estimate": "₹10–15 LPA"{feedback_section}
+  "salary_estimate": "₹10–15 LPA",
+  "improvements": ["Add more recent projects", "Quantify achievements", "Include system design experience"]
 }}
-
-Resume:
-{content}
 """
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+        client = OpenAI(api_key=openai_api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Be structured and return clean JSON."},
+                {"role": "system", "content": "You are a helpful and structured resume reviewer."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7
         )
-        reply = response.choices[0].message["content"].strip()
 
-        if reply.startswith("```json") or reply.startswith("```"):
-            reply = reply.replace("```json", "").replace("```", "").strip()
+        import json
+        from ast import literal_eval
 
-        return json.loads(reply)
+        # Parse GPT output
+        content = response.choices[0].message.content.strip()
+        try:
+            data = json.loads(content)
+        except:
+            data = literal_eval(content)  # fallback
+
+        # Display Dashboard
+        st.markdown("## 📊 Resume Insights")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.metric("🔎 Relevance Score", f"{data['relevance_score']}%")
+            st.metric("💰 Estimated Salary", data['salary_estimate'])
+
+        with col2:
+            st.progress(data['relevance_score'], text="Overall Match")
+
+        st.markdown("### 🧠 Skill Alignment")
+        for skill, score in data["skills"].items():
+            st.progress(score, text=f"{skill}: {score}%")
+
+        st.markdown("### 🛠 Project Relevance")
+        st.progress(data["project_fit"], text=f"{data['project_fit']}% Match with Role")
+
+        st.markdown("### 📉 Suggestions to Improve")
+        for item in data["improvements"]:
+            st.markdown(f"- {item}")
+
     except Exception as e:
-        st.error("❌ Error from OpenAI: " + str(e))
-        return {}
-
-# Role selector
-if "user_type" not in st.session_state:
-    st.session_state.user_type = None
-
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("👤 I'm a Job Applicant"):
-        st.session_state.user_type = "applicant"
-with col2:
-    if st.button("🧑‍💼 I'm a Recruiter / HR"):
-        st.session_state.user_type = "hr"
-
-user_type = st.session_state.user_type
-
-# === Applicant Mode ===
-if user_type == "applicant":
-    st.subheader("📄 Upload Resume for AI Feedback")
-    uploaded_file = st.file_uploader("Upload your resume (PDF)", type="pdf")
-    job_role = st.text_input("🎯 Target Job Role", placeholder="e.g. Software Engineer")
-    if st.button("🚀 Analyze Resume") and uploaded_file and job_role:
-        with st.spinner("Analyzing resume..."):
-            content = extract_text_from_pdf(uploaded_file)
-            if content.strip():
-                result = analyze_resume(content, job_role, include_feedback=True)
-                if result:
-                    st.markdown("## 📊 Resume Insights")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("🔍 Relevance", f"{result['relevance_score']}%")
-                        st.metric("💰 Salary Estimate", result['salary_estimate'])
-                    with col2:
-                        st.progress(result['relevance_score'], text="Match %")
-
-                    st.markdown("### 🧠 Skill Alignment")
-                    for skill, score in result["skills"].items():
-                        st.progress(score, text=f"{skill}: {score}%")
-
-                    st.markdown("### 🛠 Project Relevance")
-                    st.progress(result["project_fit"], text=f"{result['project_fit']}%")
-
-                    st.markdown("### ✅ Strengths")
-                    for s in result["strengths"]:
-                        st.markdown(f"- {s}")
-
-                    st.markdown("### ❌ Weaknesses")
-                    for w in result["weaknesses"]:
-                        st.markdown(f"- {w}")
-
-                    st.markdown("### 📚 Suggested Resources")
-                    for r in result["resources"]:
-                        st.markdown(f"- [{r}]({r})")
-
-                    st.markdown("### 📝 Summary")
-                    st.info(result["summary"])
-                else:
-                    st.error("Parsing failed.")
-            else:
-                st.error("Empty or unreadable resume.")
-
-# === Recruiter Mode ===
-if user_type == "hr":
-    st.subheader("📥 Upload Multiple Resumes for Screening")
-    uploaded_files = st.file_uploader("Upload Resumes (PDF)", type="pdf", accept_multiple_files=True)
-    job_role = st.text_input("🎯 Job Role to Match", placeholder="e.g. Backend Developer")
-    threshold = st.slider("📊 Minimum Relevance Score", 0, 100, 70)
-
-    if st.button("📊 Analyze All Resumes") and uploaded_files:
-        results = []
-        for file in uploaded_files:
-            content = extract_text_from_pdf(file)
-            if not content.strip():
-                continue
-            result = analyze_resume(content, job_role, include_feedback=False)
-            if result and result.get("relevance_score", 0) >= threshold:
-                results.append({
-                    "Candidate": file.name,
-                    "Relevance": result["relevance_score"],
-                    "Project Fit": result["project_fit"],
-                    "Salary": result["salary_estimate"]
-                })
-
-        if results:
-            df = pd.DataFrame(results)
-            st.markdown("## ✅ Shortlisted Candidates")
-            st.dataframe(df, use_container_width=True)
-            st.download_button("📤 Download Shortlist", df.to_csv(index=False), "shortlist.csv", "text/csv")
-        else:
-            st.warning("No resumes met the threshold.")
+        st.error(f"An error occurred while processing the resume: {e}")
